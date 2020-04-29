@@ -15,8 +15,6 @@ object GameApp extends App {
 
 class GameBot extends BasicBot {
 
-     val orders = scala.collection.mutable.Map[String, Order]()
-
      def messageUid(msg: Message) = msg.chat.id.toString+msg.messageId.toString
 
      def welcomeMessage(msg: Message) = {
@@ -39,13 +37,8 @@ class GameBot extends BasicBot {
 
      onCommand("new") { implicit msg =>
         val arguments = msg.text.get.split(" ")
-        var numberOfSlices = -1
-        var reservedSlices = -1
-        var cost = 0.0
-        var name = ""
         try {
-          ???
-          }
+          request(SendMessage(ChatId.fromChat(msg.chat.id), "Test"))
 
         } catch  {
           case e: NumberFormatException => {
