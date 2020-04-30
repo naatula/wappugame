@@ -32,34 +32,40 @@ class GameBot extends BasicBot {
      }
 
      def helpMessage(msg: Message) = {
-       """The goal of the game is to avoid drawing bombs. You may play as many cards as you like during your turn, unless the card ends your turn (skip, attack). Drawing a card from the deck ends your turn. You don't have to play any cards. If you draw a bomb, you'll either use a defuse and return the bomb in a random position in the deck, or lose the game.
+       """The goal of the game is to avoid drawing bombs from the shared deck. You may play as many cards as you like during your turn, unless the card ends your turn (skip, attack). Drawing a card from the deck ends your turn. You don't have to play any cards. If you draw a bomb, you'll either use a defuse and return the bomb in a random position in the deck, or lose the game.
 
 The attack card forces the next player to draw twice
 The skip card skips your turn
 The shuffle card shuffles the deck
 The future card tells you the three topmost cards of the deck
 The favor card steals a random card from a random player
-The nope card cancels the action of the card immediately before it. Can be used also during other players' turns"""
+The nope card cancels the action of the card immediately before it. Can be used also during other players' turns
+
+Use /commands to list all commands"""
      }
      
      def commandsMessage(msg: Message) = {
-       """Game management:
+       """<b>Game management:</b>
 /join [code] - Join a game with an invite code
 /leave - Leaves the current game
 /create - Create a new game
 /play - Starts the game (host only)
  
-In-game:
-/players - Show the player list. Also displays the amount of cards they have
+<b>In-game:</b>
+/players - Show the player list with card amounts
 /cards - View information about your hand and the deck
-/draw - Draws the topmost card from the deck during your turn
-Use cards on your turn:
+/draw - Draws a card and ends your turn
+
+<b>Use cards:</b>
 /attack
 /skip
 /shuffle
 /future
 /favor
-/nope (also when it's not your turn)"""
+/nope <i>(also when it's not your turn)</i>
+
+/help"""
+      
      }
      
      val cardNames = collection.immutable.Map("bomb"->"a bomb", "defuse"->"a defuse", "attack"->"an attack", "skip"->"a skip", "nope"->"a nope", "shuffle"->"a shuffle", "future"->"a future", "favor"->"a favor", "critter0"->"a C1", "critter1"->"a C2", "critter2"->"a C3", "critter3"->"a C4", "critter4"->"a C5")
@@ -83,7 +89,7 @@ Use cards on your turn:
        leaveGame(msg.chat)
        val game = new Game(msg)
        games += game
-       send(ChatId.fromChat(msg.chat.id), "New game created! Others can join by using <pre>/join " + game.code + "</pre>" )
+       send(ChatId.fromChat(msg.chat.id), "New game created! Start the game with /play once everyone has joined using the following command: <pre>/join " + game.code + "</pre>" )
      }
      
      
