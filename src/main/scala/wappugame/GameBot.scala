@@ -27,11 +27,39 @@ class GameBot extends BasicBot {
        """Join a game by using /join [code]
 /help to see the rules
 /create to start a new game
+/commands lists all commands
          """
      }
 
      def helpMessage(msg: Message) = {
-       """TODO"""
+       """The goal of the game is to avoid drawing bombs. You may play as many cards as you like during your turn, unless the card ends your turn (skip, attack). Drawing a card from the deck ends your turn. You don't have to play any cards. If you draw a bomb, you'll either use a defuse and return the bomb in a random position in the deck, or lose the game.
+
+The attack card forces the next player to draw twice
+The skip card skips your turn
+The shuffle card shuffles the deck
+The future card tells you the three topmost cards of the deck
+The favor card steals a random card from a random player
+The nope card cancels the action of the card immediately before it. Can be used also during other players' turns"""
+     }
+     
+     def commandsMessage(msg: Message) = {
+       """Game management:
+/join [code] - Join a game with an invite code
+/leave - Leaves the current game
+/create - Create a new game
+/play - Starts the game (host only)
+ 
+In-game:
+/players - Show the player list. Also displays the amount of cards they have
+/cards - View information about your hand and the deck
+/draw - Draws the topmost card from the deck during your turn
+Use cards on your turn:
+/attack
+/skip
+/shuffle
+/future
+/favor
+/nope (also when it's not your turn)"""
      }
      
      val cardNames = collection.immutable.Map("bomb"->"a bomb", "defuse"->"a defuse", "attack"->"an attack", "skip"->"a skip", "nope"->"a nope", "shuffle"->"a shuffle", "future"->"a future", "favor"->"a favor", "critter0"->"a C1", "critter1"->"a C2", "critter2"->"a C3", "critter3"->"a C4", "critter4"->"a C5")
@@ -39,10 +67,16 @@ class GameBot extends BasicBot {
      def errorReply(chat: Chat, content: String)={
        send(ChatId.fromChat(chat.id), content + "errorReply")
      }
+     
+    private def shortNaming(m: Message) = {
+    val t = m.chat.title
+    if(t==None) m.from.get.firstName else t.get
+    }
 
      // Command keyword definitions
      this.command("start", welcomeMessage)
      this.command("help", helpMessage)
+     this.command("commands", commandsMessage)
      
      
      onCommand("create") { implicit msg =>
@@ -65,7 +99,7 @@ class GameBot extends BasicBot {
            response = "You are already in this game"
          }else{
            leaveGame(msg.chat)
-           announce(game.get, msg.from.get.firstName + " joined the game")
+           announce(game.get, shortNaming(msg) + " joined the game")
            game.get.join(msg)
            response = "Joined the game\n\nPlayer list:"
            game.get.players.foreach(i=>{ response += "\n" + i.name })
@@ -81,7 +115,7 @@ class GameBot extends BasicBot {
          response = "You aren't currently in a game"
        } else if(leaveGame(msg.chat)) {
          response = "You left the game"
-         announce(game.get, msg.from.get.firstName + " left the game")
+         announce(game.get, shortNaming(msg) + " left the game")
          if(msg.chat == game.get.hostChat && !game.get.hasStarted && game.get.playerCount>0) {
            game.get.hostChat = game.get.players.filter(_.chat!=game.get.hostChat).head.chat
            send(ChatId.fromChat(game.get.hostChat.id), "The host left the game. You are the new host")
@@ -119,20 +153,19 @@ class GameBot extends BasicBot {
        send(ChatId.fromChat(msg.chat.id), response)
      }
      
-     onCommand("hand") { implicit msg =>
+     onCommand("cards") { implicit msg =>
        var response = "Your hand:"
        val game = currentGame(msg.chat)
        if(game == None) {
          response = "You are not in a game"
        } else {
          response += game.get.findPlayer(msg.chat).get.handString
+         response += "\n\nCards in deck: " + game.get.deck.size
        }
        send(ChatId.fromChat(msg.chat.id), response )
      }
      
      onCommand("play") { implicit msg =>
-       println(games)
-       println(games.map(_.players.map(_.name)))
        val game = currentGame(msg.chat)
        if(game == None){
          send(ChatId.fromChat(msg.chat.id), "You are not in a game")
@@ -372,11 +405,10 @@ def drawFromDeck(chat: Chat, g: Game) = {
          val p = g.currentPlayer.get
          
          val c = g.draw
-                println("drew "+ c)
          if(c == "bomb"){
            if(p.hand.contains("defuse")){
              p.hand -= "defuse"
-             announce(g, p.name + " drew a bomb and defused it!")
+             announce(g, p.name + " drew a bomb and defused it! 💣")
              g.addBomb
          
              if(g.inAttack){
@@ -422,6 +454,7 @@ def drawFromDeck(chat: Chat, g: Game) = {
            if(g.inAttack) response += " You have been attacked, so you must draw two cards!"
            response += "\n\nYour hand:"
            response += p.get.handString
+           response += "\n\nCards in deck: " + g.deck.size
            send(ChatId.fromChat(p.get.chat.id), response)
          }
        }
@@ -449,14 +482,10 @@ def drawFromDeck(chat: Chat, g: Game) = {
        val game = currentGame(chat)
        if (game != None){
          val r = game.get.leave(chat)
-         println("leaving")
          if(game.get.playerCount==0) {
-           println("remove")
            games -= game.get
-           println("removed from list")
          }
          else if(game.get.isCurrentPlayer(chat)){
-           println("next")
            game.get.nextPlayer
            notifyPlayer(game.get)
          } else if (game.get.hasEnded){
@@ -486,7 +515,19 @@ def drawFromDeck(chat: Chat, g: Game) = {
 
 class Game(val creationMessage: Message){
   val initialHandSize = 4 // 7 would be with all card types
-  val players = Buffer[Player](new Player(creationMessage.chat, creationMessage.from.get.firstName))
+  private def naming(m: Message) = {
+    val t = m.chat.title
+    if(t==None){
+      if(m.from.get.lastName==None){
+        m.from.get.firstName
+      }else{
+        m.from.get.firstName + " " + m.from.get.lastName.get
+      }
+    } else {
+      t.get
+    }
+  }
+  val players = Buffer[Player](new Player(creationMessage.chat, naming(creationMessage)))
   var hostChat = creationMessage.chat
   def playerCount = players.size
   def playerChats = players.map(_.chat) // List of chats
@@ -502,12 +543,13 @@ class Game(val creationMessage: Message){
   def hasStarted = started
   def hasEnded = hasStarted && players.count(_.alive) <= 1
   
+  
   def join(msg: Message) = {
     if(hasStarted){
       false
     } else {
       
-      players += new Player(msg.chat, msg.from.get.firstName)
+      players += new Player(msg.chat, naming(msg))
       true
     }
   }
@@ -584,9 +626,7 @@ class Game(val creationMessage: Message){
   /** Adds a bomb into the deck in a random position */
   def addBomb = {
     val n = Random.nextInt(deck.size)
-    println(deck)
     deck = (deck.take(n) :+ ("bomb")) ++: (deck.drop(n))
-    println(deck)
   }
   
   /**
@@ -618,14 +658,12 @@ class Game(val creationMessage: Message){
       p.hand ++= newDeck.take(initialHandSize)
       newDeck = newDeck.drop(initialHandSize)
       p.hand += "defuse"
-      println(p.name, p.hand)
     })
     
     
     for(i <- 0 until 7-playerCount) newDeck.append("defuse")
     for(i <- 0 until playerCount-1) newDeck.append("bomb")
     deck = Random.shuffle(newDeck)
-    println(deck)
   }
   
   
