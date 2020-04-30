@@ -115,21 +115,11 @@ Use /commands to list all commands"""
      }
      
      onCommand("leave") { implicit msg =>
-       var response = ""
        val game = currentGame(msg.chat)
        if(game == None){
-         response = "You aren't currently in a game"
-       } else if(leaveGame(msg.chat)) {
-         response = "You left the game"
-         announce(game.get, shortNaming(msg) + " left the game")
-         if(msg.chat == game.get.hostChat && !game.get.hasStarted && game.get.playerCount>0) {
-           game.get.hostChat = game.get.players.filter(_.chat!=game.get.hostChat).head.chat
-           send(ChatId.fromChat(game.get.hostChat.id), "The host left the game. You are the new host")
-         }
-       } else {
-         response = "Failed to leave the game. This is an error."
-       }
-       send(ChatId.fromChat(msg.chat.id), response)
+         send(ChatId.fromChat(msg.chat.id), "You aren't currently in a game")
+       } else (leaveGame(msg.chat))
+       
      }
      
      onCommand("players") { implicit msg =>
@@ -343,6 +333,7 @@ Use /commands to list all commands"""
              case None => send(ChatId.fromChat(u.chat.id), "There's nothing to undo at the moment")
              case Some("skip") => {
                announce(g, u.name + " used a nope on the skip!")
+               u.hand -= "nope"
                if(g.wasNoped){
                  g.wasNoped = false
                  g.nextPlayer
@@ -354,6 +345,7 @@ Use /commands to list all commands"""
                }
              }
              case Some("attack") => {
+               u.hand -= "nope"
                announce(g, u.name + " used a nope on the attack!")
                if(g.wasNoped){
                  g.wasNoped = false
@@ -368,6 +360,7 @@ Use /commands to list all commands"""
                }
              }
              case Some("favor") => {
+               u.hand -= "nope"
                announce(g, u.name + " used a nope on the favor!")
                val s = g.takenCard.get._1 // The one who took the card
                val v = g.takenCard.get._2 // The one who it was taken from
@@ -384,6 +377,7 @@ Use /commands to list all commands"""
                notifyPlayer(g)
              }
              case Some("shuffle") => {
+               u.hand -= "nope"
                announce(g, u.name + " used a nope on the shuffle!")
                if(g.wasNoped){
                  g.wasNoped = false
@@ -450,6 +444,7 @@ def drawFromDeck(chat: Chat, g: Game) = {
       * Handles game over situations.
       */
      def notifyPlayer(g: Game): Unit = {
+       println("notify")
        if(g.hasEnded){
          announce(g, g.players.find(_.alive).get.name + " won the game!")
          g.players.clear
@@ -457,6 +452,7 @@ def drawFromDeck(chat: Chat, g: Game) = {
          var response = "It's your turn!"
          val p = g.currentPlayer
          if(p != None){
+           println(p.get.name)
            if(g.inAttack) response += " You have been attacked, so you must draw two cards!"
            response += "\n\nYour hand:"
            response += p.get.handString
@@ -487,15 +483,26 @@ def drawFromDeck(chat: Chat, g: Game) = {
      def leaveGame(chat: Chat) = {
        val game = currentGame(chat)
        if (game != None){
+         val name = game.get.findPlayer(chat).get.name
+         println(name + "leaving")
+         val isCurrent = game.get.isCurrentPlayer(chat)
          val r = game.get.leave(chat)
+         println(name + "leaving")
          if(game.get.playerCount==0) {
            games -= game.get
-         }
-         else if(game.get.isCurrentPlayer(chat)){
-           game.get.nextPlayer
-           notifyPlayer(game.get)
-         } else if (game.get.hasEnded){
-           notifyPlayer(game.get)
+         } else {
+           announce(game.get, name + " left the game")
+           if(chat == game.get.hostChat && !game.get.hasStarted && game.get.playerCount>0) {
+             game.get.hostChat = game.get.players.filter(_.chat!=game.get.hostChat).head.chat
+             send(ChatId.fromChat(game.get.hostChat.id), "The host left the game. You are the new host")
+           }
+           println(isCurrent)
+           if(isCurrent){
+             game.get.nextPlayer
+             notifyPlayer(game.get)
+           } else if (game.get.hasEnded){
+             notifyPlayer(game.get)
+           }
          }
          r
        } else {
@@ -571,7 +578,7 @@ class Game(val creationMessage: Message){
       if(hasEnded){ // This one should never happen
         println("Tried to leave a game that has ended")
         false
-      } else if (hasStarted) {
+      } else if (hasStarted && player.get.alive) {
         players -= player.get
         deck -= "bomb"
         true
