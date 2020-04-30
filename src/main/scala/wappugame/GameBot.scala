@@ -17,7 +17,9 @@ object GameApp extends App {
    println("Started")
 }
 
-class GameBot extends BasicBot {
+class GameBot extends TelegramBot with Polling with Commands with Callbacks {
+  
+     def token = scala.io.Source.fromFile("bot_token.txt").mkString.trim
   
      val games = Buffer[Game]()
 
@@ -80,10 +82,18 @@ Use /commands to list all commands"""
     }
 
      // Command keyword definitions
-     this.command("start", welcomeMessage)
-     this.command("help", helpMessage)
-     this.command("commands", commandsMessage)
+
+     onCommand("start") { implicit msg =>
+       send(ChatId.fromChat(msg.chat.id), welcomeMessage(msg))
+     }
+
+     onCommand("help") { implicit msg =>
+       send(ChatId.fromChat(msg.chat.id), helpMessage(msg))
+     }
      
+     onCommand("commands") { implicit msg =>
+       send(ChatId.fromChat(msg.chat.id), commandsMessage(msg))
+     }
      
      onCommand("create") { implicit msg =>
        leaveGame(msg.chat)
