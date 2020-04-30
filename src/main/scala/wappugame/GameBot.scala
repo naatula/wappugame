@@ -118,7 +118,9 @@ Use /commands to list all commands"""
        val game = currentGame(msg.chat)
        if(game == None){
          send(ChatId.fromChat(msg.chat.id), "You aren't currently in a game")
-       } else (leaveGame(msg.chat))
+       } else {
+         if(leaveGame(msg.chat)) send(ChatId.fromChat(msg.chat.id), "You left the game")
+       }
        
      }
      
@@ -444,7 +446,6 @@ def drawFromDeck(chat: Chat, g: Game) = {
       * Handles game over situations.
       */
      def notifyPlayer(g: Game): Unit = {
-       println("notify")
        if(g.hasEnded){
          announce(g, g.players.find(_.alive).get.name + " won the game!")
          g.players.clear
@@ -452,7 +453,6 @@ def drawFromDeck(chat: Chat, g: Game) = {
          var response = "It's your turn!"
          val p = g.currentPlayer
          if(p != None){
-           println(p.get.name)
            if(g.inAttack) response += " You have been attacked, so you must draw two cards!"
            response += "\n\nYour hand:"
            response += p.get.handString
@@ -484,10 +484,8 @@ def drawFromDeck(chat: Chat, g: Game) = {
        val game = currentGame(chat)
        if (game != None){
          val name = game.get.findPlayer(chat).get.name
-         println(name + "leaving")
          val isCurrent = game.get.isCurrentPlayer(chat)
          val r = game.get.leave(chat)
-         println(name + "leaving")
          if(game.get.playerCount==0) {
            games -= game.get
          } else {
@@ -496,7 +494,6 @@ def drawFromDeck(chat: Chat, g: Game) = {
              game.get.hostChat = game.get.players.filter(_.chat!=game.get.hostChat).head.chat
              send(ChatId.fromChat(game.get.hostChat.id), "The host left the game. You are the new host")
            }
-           println(isCurrent)
            if(isCurrent){
              game.get.nextPlayer
              notifyPlayer(game.get)
